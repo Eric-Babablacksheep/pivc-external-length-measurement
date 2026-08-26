@@ -7,7 +7,7 @@ Build a reproducible Google Colab workflow that combines the four verified Robof
 ## Confirmed inputs
 
 - Four independently exported Roboflow datasets: `L35`, `L40`, `L45`, and `L50`.
-- 495 images total, currently split into 346 training, 75 validation, and 73 testing images.
+- 495 images total, currently split into 347 training, 75 validation, and 73 testing images.
 - Every export uses the same mapping: class `0` is `mark`; class `1` is `picc`.
 - Labels are YOLO polygon segmentation labels, with no detected bounding-box-only or malformed rows.
 - Images have length-prefixed filenames but no capture-session or continuous-burst identifiers.
