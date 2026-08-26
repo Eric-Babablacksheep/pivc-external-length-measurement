@@ -42,7 +42,7 @@ names:
 
 ## Training configuration
 
-Training will use the Ultralytics Python API and pretrained `yolov8s-seg.pt` weights on a Colab GPU. The initial run will use:
+Training will use the Ultralytics Python API and pretrained `yolov8m-seg.pt` weights on a Colab GPU. The initial run will use:
 
 - Image size: 960.
 - Epoch limit: 200.
@@ -84,3 +84,4 @@ At the end of this stage, the notebook will verify that `best.pt` exists, reload
 - Perceptual-hash screening will not identify every related capture.
 - Training and segmentation mAP do not validate external PICC length measurement.
 - The proof-of-concept movement threshold will not be assessed until the later complete-pipeline validation stage.
+- At 960 px, `yolov8m-seg.pt` may exceed the memory available on some free Colab GPUs at batch size 4; a verified CUDA out-of-memory error will require restarting with batch size 2.
