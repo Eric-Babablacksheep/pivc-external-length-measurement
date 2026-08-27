@@ -62,7 +62,7 @@ Quality diagnostics include component count, retained-area ratio, endpoint conta
 
 Skeletonization operates only inside the cleaned PICC mask. The skeleton is converted into an 8-connected weighted graph with orthogonal edge weight 1 and diagonal edge weight square-root 2. Short spurs are pruned conservatively. The ordered centreline is the longest valid geodesic path between skeleton endpoints, not the sum of every skeleton pixel.
 
-The ordered path is smoothed without materially shortening real curvature. Both raw geodesic and smoothed path lengths are retained; excessive disagreement causes rejection. The current two-class design can identify two geometric endpoints but cannot inherently name skin versus hub. Total external length does not require orientation, so endpoints remain unordered until later evidence supports reliable semantic naming.
+The first implementation uses the weighted ordered geodesic directly and does not apply curve smoothing. This avoids introducing a second source of length change before raw skeleton behavior has been inspected. Short branches may be pruned conservatively, and the Euclidean endpoint distance is retained as a diagnostic sanity check. The current two-class design can identify two geometric endpoints but cannot inherently name skin versus hub. Total external length does not require orientation, so endpoints remain unordered until later evidence supports reliable semantic naming.
 
 ## Mark processing
 
@@ -72,21 +72,16 @@ At least two reliable marks are required. Images with fewer than two—including
 
 ## Calibration
 
-The engine reports two calibration estimates:
+The first implementation uses the median of accepted adjacent projected-mark distances along the ordered centreline. Mark centroids provide the scale reference, but their straight-line Euclidean separation is diagnostic only: calibration uses distance along the same curved centreline used for total PICC length.
 
-1. A simple median of accepted adjacent projected-mark distances.
-2. A robust one-dimensional lattice estimate of the underlying 1 cm spacing.
-
-The robust estimator permits an observed gap to represent an integer multiple of the base 1 cm spacing, which protects against missed mark detections. It searches plausible base spacings, assigns adjacent gaps to positive integer multiples, minimizes robust residual error, and requires sufficient inlier support. This is preferred over assuming every detected adjacent pair is physically consecutive.
-
-Calibration is rejected when the simple and robust estimates disagree beyond a configured tolerance, spacing residuals are inconsistent, the number of usable marks is insufficient, or the estimated scale is geometrically implausible. All accepted/rejected marks, gap distances, inferred gap multiples, residuals, and selected pixels-per-centimetre value are saved.
+Calibration requires at least two accepted marks. Adjacent spacings are displayed individually and rejected when their variation exceeds a configured tolerance or the resulting scale is geometrically implausible. This deliberately simple method assumes detected adjacent marks are physically consecutive. A missed intermediate mark can therefore create an apparent 2 cm gap; debug output must expose this case, and a robust missing-mark lattice estimator is deferred until the basic pipeline has been tested visually on development images.
 
 ## Measurement and rejection
 
 For a valid image:
 
 ```text
-external_length_cm = smoothed_centreline_length_px / pixels_per_cm
+external_length_cm = ordered_centreline_length_px / pixels_per_cm
 ```
 
 The image is rejected rather than measured when inference, mask topology, endpoint visibility, centreline, mark association, or calibration fails a quality gate. Rejection reasons are stable codes with plain-language messages. Confidence thresholds and geometric tolerances are configuration parameters that will be finalized using development data and then frozen before held-out validation.
@@ -95,13 +90,13 @@ Filename-derived ground truth is parsed only after prediction and is used solely
 
 ## Debugging output
 
-The debug image contains panels for the original image, raw predicted PICC mask, cleaned mask, skeleton, ordered and smoothed centreline, unordered endpoints, all mark centroids, accepted/rejected marks, centreline projections, adjacent distances, inferred gap multiples, selected calibration, final length, and rejection reasons.
+The debug image contains panels for the original image, raw predicted PICC mask, cleaned mask, skeleton, ordered centreline, unordered endpoints, all mark centroids, accepted/rejected marks, centreline projections, adjacent path distances, Euclidean mark distances for comparison, selected calibration, final length, and rejection reasons.
 
 The JSON output stores the same numerical decisions so failures can be compared without relying only on visualization.
 
 ## Development and testing sequence
 
-Implementation proceeds through unit-tested components: filename parsing, label-independent inference structures, mask cleanup, synthetic skeleton graphs, spur pruning, longest-path ordering, centroid projection, robust spacing estimation, measurement calculation, rejection behavior, and end-to-end debug generation. Synthetic masks and paths provide exact geometric expectations before real-image tuning.
+Implementation proceeds through unit-tested components: filename parsing, label-independent inference structures, mask cleanup, synthetic skeleton graphs, conservative spur pruning, longest-path ordering, centroid projection, median adjacent path spacing, measurement calculation, rejection behavior, and end-to-end debug generation. Synthetic masks and paths provide exact geometric expectations before real-image tuning.
 
 The first real-image checkpoint runs a single non-test development image on CPU and verifies coordinate alignment and class resolution. Later checkpoints add geometry one component at a time. The held-out test split is not opened or tuned against during this stage.
 
