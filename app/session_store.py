@@ -86,3 +86,36 @@ class BaselineSessionStore:
     def count(self) -> int:
         with self._lock:
             return len(self._sessions)
+
+    def list_summaries(self) -> list[dict]:
+        with self._lock:
+            sessions = sorted(
+                reversed(list(self._sessions.values())),
+                key=lambda session: session["created_at"],
+                reverse=True,
+            )
+            summaries = []
+            for session in sessions:
+                latest = (
+                    session["follow_ups"][-1]
+                    if session["follow_ups"]
+                    else None
+                )
+                summaries.append({
+                    "session_id": session["session_id"],
+                    "created_at": session["created_at"],
+                    "baseline_length_cm": session["baseline"][
+                        "external_length_cm"
+                    ],
+                    "successful_follow_up_count": len(
+                        session["follow_ups"]
+                    ),
+                    "latest_signed_change_cm": (
+                        latest["signed_change_cm"] if latest else None
+                    ),
+                    "latest_indicator": deepcopy(
+                        latest["research_indicator"]
+                    ) if latest else None,
+                })
+
+        return summaries

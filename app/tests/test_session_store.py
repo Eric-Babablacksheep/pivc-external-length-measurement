@@ -117,6 +117,36 @@ class BaselineSessionStoreFollowUpTests(unittest.TestCase):
             updated["follow_ups"][0]["research_indicator"]["code"],
         )
 
+    def test_summaries_are_newest_first_and_include_latest_change(self):
+        older = self.store.create(measured(3.5), settings())
+        self.store.add_follow_up(
+            older["session_id"],
+            measured(3.7),
+            indicator("OUTWARD_INCREASE"),
+        )
+        newer = self.store.create(measured(4.0), settings())
+
+        summaries = self.store.list_summaries()
+
+        self.assertEqual(newer["session_id"], summaries[0]["session_id"])
+        self.assertEqual(older["session_id"], summaries[1]["session_id"])
+        self.assertEqual(
+            {
+                "session_id",
+                "created_at",
+                "baseline_length_cm",
+                "successful_follow_up_count",
+                "latest_signed_change_cm",
+                "latest_indicator",
+            },
+            set(summaries[1]),
+        )
+        self.assertEqual(0.2, summaries[1]["latest_signed_change_cm"])
+        self.assertEqual(
+            "OUTWARD_INCREASE",
+            summaries[1]["latest_indicator"]["code"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

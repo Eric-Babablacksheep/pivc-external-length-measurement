@@ -10,11 +10,12 @@ import cv2
 import numpy as np
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from ultralytics import YOLO
 from session_store import BaselineSessionStore
+from session_exports import session_csv, session_export_payload
 from decimal import Decimal
 from settings_store import ResearchSettings, ResearchSettingsStore
 
@@ -533,6 +534,42 @@ def get_session(session_id: str):
         )
 
     return session
+
+
+@app.get("/api/v1/sessions")
+def list_sessions():
+    return {"sessions": SESSION_STORE.list_summaries()}
+
+
+@app.get("/api/v1/sessions/{session_id}/export.json")
+def export_session_json(session_id: str):
+    session = SESSION_STORE.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    return JSONResponse(
+        content=session_export_payload(session),
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="pivc-session-{session_id}.json"'
+            )
+        },
+    )
+
+
+@app.get("/api/v1/sessions/{session_id}/export.csv")
+def export_session_csv(session_id: str):
+    session = SESSION_STORE.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    return StreamingResponse(
+        iter([session_csv(session)]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="pivc-session-{session_id}.csv"'
+            )
+        },
+    )
 
 
 @app.post("/api/v1/sessions/{session_id}/follow-up")
