@@ -22,6 +22,17 @@ const elements = {
   followUpGuidance: $("#follow-up-guidance"),
   acquisitionConfirmation: $("#acquisition-confirmation"),
   confirmationHelp: $("#confirmation-help"),
+  settingsForm: $("#settings-form"),
+  settingsApplyNote: $("#settings-apply-note"),
+  settingsError: $("#settings-error"),
+  settingsSuccess: $("#settings-success"),
+  settingsSaveButton: $("#settings-save-button"),
+  settingsResetButton: $("#settings-reset-button"),
+  sessionsLoading: $("#sessions-loading"),
+  sessionsEmpty: $("#sessions-empty"),
+  sessionsError: $("#sessions-error"),
+  sessionList: $("#session-list"),
+  sessionsRefreshButton: $("#sessions-refresh-button"),
 };
 
 const acquisitionChecks = Array.from(
@@ -31,6 +42,26 @@ const acquisitionChecks = Array.from(
 let selectedFile = null;
 let previewUrl = null;
 let activeSessionId = null;
+const viewNames = ["analyse", "sessions", "settings", "guide"];
+
+function activateView(viewName, updateHash = true) {
+  const selected = viewNames.includes(viewName) ? viewName : "analyse";
+  for (const name of viewNames) {
+    const panel = $(`#${name}-view`);
+    const active = name === selected;
+    setHidden(panel, !active);
+    document.querySelectorAll(`[data-view="${name}"]`).forEach((control) => {
+      control.classList.toggle("active", active);
+      if (control.getAttribute("role") === "tab") {
+        control.setAttribute("aria-selected", String(active));
+        control.tabIndex = active ? 0 : -1;
+      }
+    });
+  }
+  if (updateHash) location.hash = selected;
+  if (selected === "settings") loadSettings();
+  if (selected === "sessions") loadSessions();
+}
 
 function setHidden(element, hidden) { element.hidden = hidden; }
 function diagnosticUrl(result) {
@@ -66,6 +97,7 @@ function clearSelectedImage() {
   resetAcquisitionConfirmation();
 }
 function resetForNewSession() {
+  if (activeSessionId && !window.confirm("Start a new session and leave the active baseline?")) return;
   activeSessionId = null;
   clearSelectedImage();
   setHidden(elements.resultPlaceholder, false);
@@ -83,6 +115,10 @@ function resetForNewSession() {
   elements.analyseButton.textContent = "Establish baseline";
   elements.status.textContent = "Waiting for image";
   elements.status.className = "status-badge status-idle";
+  $("#technical-settings").textContent = "—";
+  $("#technical-session-id").textContent = "—";
+  $("#technical-timestamp").textContent = "—";
+  elements.settingsApplyNote.textContent = "Changes apply to new baseline sessions.";
 }
 function prepareFollowUpCapture() {
   clearSelectedImage();
@@ -142,12 +178,19 @@ function showRejected(result, followUp = false) {
   $("#rejection-reason").textContent = result.rejection_reason || "The image could not produce a safe measurement.";
   $("#rejection-stage").textContent = result.rejection_stage ? `Rejected during: ${result.rejection_stage}` : "";
 }
-function showBaselineSession(result) {
-  activeSessionId = result.session_id;
+function showBaselineSession(result, makeActive = true) {
+  if (makeActive) activeSessionId = result.session_id;
   elements.baselineSessionId.textContent = result.session_id;
   const createdAt = new Date(result.created_at);
   elements.baselineCreatedAt.textContent = Number.isNaN(createdAt.getTime()) ? result.created_at : createdAt.toLocaleString();
   setHidden(elements.baselineSessionPanel, false);
+  $("#technical-session-id").textContent = result.session_id;
+  $("#technical-timestamp").textContent = result.created_at;
+  const settings = result.settings;
+  $("#technical-settings").textContent = settings
+    ? `conf ${settings.confidence}, IoU ${settings.iou}, tolerance ±${settings.tolerance_cm} cm, ${settings.imgsz}px`
+    : "Not available";
+  elements.settingsApplyNote.textContent = "An active session keeps its original settings. Changes apply to the next baseline.";
 }
 function showResearchIndicator(indicator) {
   if (!indicator) {
@@ -205,6 +248,138 @@ function showComparison(result) {
   showResearchIndicator(result.research_indicator);
 }
 
+async function loadSettings() {
+  setHidden(elements.settingsError, true);
+  try {
+    const response = await fetch("/api/v1/settings");
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "Settings could not be loaded.");
+    $("#setting-confidence").value = payload.editable.confidence;
+    $("#setting-iou").value = payload.editable.iou;
+    $("#setting-tolerance").value = payload.editable.tolerance_cm;
+    $("#runtime-imgsz").textContent = `${payload.runtime.imgsz} px`;
+    $("#runtime-device").textContent = payload.runtime.device;
+    $("#runtime-model-status").textContent = payload.runtime.model_loaded ? "Loaded" : "Not loaded";
+    $("#runtime-model-name").textContent = payload.runtime.model_filename;
+    $("#runtime-model-task").textContent = payload.runtime.model_task || "Unavailable";
+    $("#runtime-app-version").textContent = payload.runtime.application_version;
+  } catch (error) {
+    elements.settingsError.textContent = error.message;
+    setHidden(elements.settingsError, false);
+  }
+}
+
+async function saveSettings(event) {
+  event.preventDefault();
+  elements.settingsSaveButton.disabled = true;
+  setHidden(elements.settingsError, true);
+  setHidden(elements.settingsSuccess, true);
+  const update = {
+    confidence: Number($("#setting-confidence").value),
+    iou: Number($("#setting-iou").value),
+    tolerance_cm: Number($("#setting-tolerance").value),
+  };
+  try {
+    const response = await fetch("/api/v1/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(update),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      const detail = Array.isArray(payload.detail)
+        ? payload.detail.map((item) => `${item.loc.at(-1)}: ${item.msg}`).join("; ")
+        : payload.detail;
+      throw new Error(detail || "Settings were rejected.");
+    }
+    localStorage.setItem("pivc-settings", JSON.stringify(payload.editable));
+    elements.settingsSuccess.textContent = activeSessionId
+      ? "Saved. These defaults apply to the next baseline session."
+      : "Research defaults saved.";
+    setHidden(elements.settingsSuccess, false);
+    await loadSettings();
+  } catch (error) {
+    elements.settingsError.textContent = error.message;
+    setHidden(elements.settingsError, false);
+  } finally {
+    elements.settingsSaveButton.disabled = false;
+  }
+}
+
+async function resetSettings() {
+  if (!window.confirm("Restore confidence 0.50, IoU 0.70 and tolerance 0.10 cm?")) return;
+  try {
+    const response = await fetch("/api/v1/settings/reset", { method: "POST" });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "Defaults could not be reset.");
+    localStorage.setItem("pivc-settings", JSON.stringify(payload.editable));
+    await loadSettings();
+    elements.settingsSuccess.textContent = "Validated defaults restored.";
+    setHidden(elements.settingsSuccess, false);
+  } catch (error) {
+    elements.settingsError.textContent = error.message;
+    setHidden(elements.settingsError, false);
+  }
+}
+
+function sessionCard(summary) {
+  const indicator = summary.latest_indicator?.label || "No follow-up yet";
+  const change = summary.latest_signed_change_cm == null
+    ? "—" : `${summary.latest_signed_change_cm > 0 ? "+" : ""}${Number(summary.latest_signed_change_cm).toFixed(3)} cm`;
+  return `<article class="session-card">
+    <div><span class="session-time">${new Date(summary.created_at).toLocaleString()}</span><h3>${Number(summary.baseline_length_cm).toFixed(3)} cm baseline</h3><p>${summary.successful_follow_up_count} follow-up(s) · ${change} · ${indicator}</p></div>
+    <div class="session-actions"><button class="button button-secondary" type="button" data-open-session="${summary.session_id}">Open</button><a class="button button-secondary" href="/api/v1/sessions/${summary.session_id}/export.json">JSON</a><a class="button button-secondary" href="/api/v1/sessions/${summary.session_id}/export.csv">CSV</a></div>
+  </article>`;
+}
+
+async function loadSessions() {
+  setHidden(elements.sessionsLoading, false);
+  setHidden(elements.sessionsError, true);
+  try {
+    const response = await fetch("/api/v1/sessions");
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "Sessions could not be loaded.");
+    elements.sessionList.innerHTML = payload.sessions.map(sessionCard).join("");
+    setHidden(elements.sessionsEmpty, payload.sessions.length !== 0);
+  } catch (error) {
+    elements.sessionsError.textContent = error.message;
+    setHidden(elements.sessionsError, false);
+  } finally {
+    setHidden(elements.sessionsLoading, true);
+  }
+}
+
+async function openSession(sessionId) {
+  try {
+    const response = await fetch(`/api/v1/sessions/${sessionId}`);
+    const session = await response.json();
+    if (!response.ok) throw new Error(session.detail || "Session could not be opened.");
+    showMeasurement(session.baseline);
+    showBaselineDiagnostic(session.baseline);
+    showBaselineSession(session, false);
+    const latest = session.follow_ups.at(-1);
+    if (latest) {
+      showComparison({
+        baseline: session.baseline,
+        follow_up: latest.measurement,
+        comparison: latest,
+        research_indicator: latest.research_indicator,
+        successful_follow_up_count: session.follow_ups.length,
+      });
+    }
+    activateView("analyse");
+    if (window.confirm("Continue this session with another follow-up image?")) {
+      activeSessionId = session.session_id;
+      prepareFollowUpCapture();
+    } else {
+      activeSessionId = null;
+    }
+  } catch (error) {
+    elements.sessionsError.textContent = error.message;
+    setHidden(elements.sessionsError, false);
+  }
+}
+
 async function analyseImage() {
   if (!selectedFile) { showRequestError("Choose an image before starting the analysis."); return; }
   setHidden(elements.previewState, true);
@@ -229,12 +404,14 @@ async function analyseImage() {
       elements.status.textContent = "Baseline established";
       elements.status.className = "status-badge status-measured";
       prepareFollowUpCapture();
+      loadSessions();
     } else if (result.session_status === "BASELINE_REJECTED") {
       showRejected(result.baseline);
     } else if (result.session_status === "FOLLOW_UP_MEASURED") {
       showMeasurement(result.follow_up);
       showComparison(result);
       prepareFollowUpCapture();
+      loadSessions();
     } else if (result.session_status === "FOLLOW_UP_REJECTED") {
       showRejected(result.follow_up, true);
       showResearchIndicator(result.research_indicator);
@@ -256,6 +433,28 @@ elements.replaceButton.addEventListener("click", () => elements.input.click());
 elements.analyseButton.addEventListener("click", analyseImage);
 elements.newSessionButton.addEventListener("click", resetForNewSession);
 elements.input.addEventListener("change", (event) => selectImage(event.target.files?.[0]));
+elements.settingsForm.addEventListener("submit", saveSettings);
+elements.settingsResetButton.addEventListener("click", resetSettings);
+elements.sessionsRefreshButton.addEventListener("click", loadSessions);
+elements.sessionList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-open-session]");
+  if (button) openSession(button.dataset.openSession);
+});
+document.querySelectorAll("[data-view]").forEach((control) => {
+  control.addEventListener("click", () => activateView(control.dataset.view));
+});
+document.querySelectorAll('[role="tab"]').forEach((tab) => {
+  tab.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+    event.preventDefault();
+    const current = viewNames.indexOf(tab.dataset.view);
+    const offset = event.key === "ArrowRight" ? 1 : -1;
+    const next = viewNames[(current + offset + viewNames.length) % viewNames.length];
+    activateView(next);
+    $(`#${next}-tab`).focus();
+  });
+});
+window.addEventListener("hashchange", () => activateView(location.hash.slice(1), false));
 acquisitionChecks.forEach((checkbox) => {
   checkbox.addEventListener("change", updateAnalysisReadiness);
 });
@@ -275,3 +474,4 @@ if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/static/service-worker.js").catch(() => {});
   });
 }
+activateView(location.hash.slice(1) || "analyse", false);

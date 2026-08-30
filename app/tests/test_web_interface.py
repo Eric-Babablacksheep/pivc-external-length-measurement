@@ -107,6 +107,103 @@ class WebInterfaceStructureTests(unittest.TestCase):
         self.assertIn("elements.followUpGuidance", javascript)
         self.assertIn("setHidden(elements.followUpGuidance, false)", javascript)
 
+    def test_dashboard_has_four_accessible_views(self):
+        html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        for name in ("analyse", "sessions", "settings", "guide"):
+            self.assertRegex(
+                html,
+                rf'id=["\']{name}-tab["\'][^>]+role=["\']tab["\']',
+            )
+            self.assertRegex(
+                html,
+                rf'id=["\']{name}-view["\'][^>]+role=["\']tabpanel["\']',
+            )
+        self.assertRegex(html, r'id=["\']mobile-navigation["\']')
+
+    def test_javascript_supports_keyboard_and_hash_navigation(self):
+        javascript = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+        for token in (
+            "function activateView",
+            "aria-selected",
+            "location.hash",
+            "hashchange",
+            "ArrowLeft",
+            "ArrowRight",
+        ):
+            self.assertIn(token, javascript)
+
+    def test_settings_view_exposes_editable_and_runtime_controls(self):
+        html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        for required_id in (
+            "settings-form",
+            "setting-confidence",
+            "setting-iou",
+            "setting-tolerance",
+            "settings-save-button",
+            "settings-reset-button",
+            "settings-apply-note",
+            "runtime-imgsz",
+            "runtime-device",
+            "runtime-model-status",
+        ):
+            self.assertRegex(html, rf'id=["\']{required_id}["\']')
+
+    def test_sessions_view_exposes_history_states_and_actions(self):
+        html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        javascript = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+        for required_id in (
+            "session-list",
+            "sessions-loading",
+            "sessions-empty",
+            "sessions-error",
+            "sessions-refresh-button",
+        ):
+            self.assertRegex(html, rf'id=["\']{required_id}["\']')
+        self.assertIn("showBaselineSession(session, false)", javascript)
+
+        javascript = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+        for token in (
+            "async function loadSettings",
+            "async function saveSettings",
+            "async function resetSettings",
+            "async function loadSessions",
+            "async function openSession",
+            'localStorage.setItem("pivc-settings"',
+            "/export.json",
+            "/export.csv",
+        ):
+            self.assertIn(token, javascript)
+
+    def test_laptop_presentation_has_kpis_and_technical_details(self):
+        html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        for required_id in (
+            "baseline-length-comparison",
+            "follow-up-length-comparison",
+            "signed-change",
+            "absolute-change",
+            "technical-details",
+            "technical-settings",
+            "technical-session-id",
+            "technical-timestamp",
+        ):
+            self.assertRegex(html, rf'id=["\']{required_id}["\']')
+        self.assertRegex(
+            html,
+            r'<details[^>]+id=["\']technical-details["\']',
+        )
+
+    def test_guide_covers_method_and_limitations(self):
+        html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        for required_id in (
+            "guide-acquisition",
+            "guide-method",
+            "guide-indicators",
+            "guide-rejection",
+            "guide-limitations",
+            "guide-non-clinical",
+        ):
+            self.assertRegex(html, rf'id=["\']{required_id}["\']')
+
 
 if __name__ == "__main__":
     unittest.main()
