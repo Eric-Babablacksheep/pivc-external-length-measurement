@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="description" content="Research demonstration of AI-assisted external PIVC length measurement.">
+  <title>PIVC Vision Lab</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="PIVC Vision Lab home">
+      <span class="brand-mark" aria-hidden="true">PV</span>
+      <span>
+        <strong>PIVC Vision Lab</strong>
+        <small>External-length measurement demonstrator</small>
+      </span>
+    </a>
+    <span class="prototype-badge">Research prototype</span>
+  </header>
+
+  <main class="page-shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Baseline measurement</p>
+        <h1>Establish the first PIVC image as the measurement baseline.</h1>
+        <p class="hero-copy">
+          Capture or upload a clear image. The AI segments the PIVC and graduation marks,
+          reconstructs its centreline, and uses the built-in 1 cm spacing for calibration.
+        </p>
+      </div>
+      <div class="hero-note">
+        <span class="note-icon" aria-hidden="true">i</span>
+        <p>For demonstration only. Results are not clinically validated and must not guide patient care.</p>
+      </div>
+    </section>
+
+    <section class="workspace" aria-label="PIVC image analysis">
+      <article class="card capture-card">
+        <div class="card-heading">
+          <div>
+            <p class="step-label">Step 1</p>
+            <h2 id="capture-heading">Choose a baseline image</h2>
+          </div>
+          <span class="format-note">JPG or PNG · max 20 MB</span>
+        </div>
+
+        <section id="acquisition-guidance" class="acquisition-guide" aria-labelledby="acquisition-guide-title">
+          <div class="acquisition-guide-heading">
+            <span class="guide-icon" aria-hidden="true">◎</span>
+            <div>
+              <p class="step-label">Capture guidance</p>
+              <h3 id="acquisition-guide-title">Prepare a measurable image</h3>
+            </div>
+          </div>
+          <ul class="acquisition-guide-list">
+            <li>Keep the complete hub and insertion-side endpoint in frame.</li>
+            <li>Show at least two consecutive graduation marks clearly.</li>
+            <li>Hold the camera approximately perpendicular to the surface.</li>
+            <li>Keep the PIVC near the centre without cropping either end.</li>
+            <li>Avoid motion blur, strong glare and deep shadows.</li>
+          </ul>
+          <div id="follow-up-guidance" class="follow-up-guide" hidden>
+            <strong>Match the baseline image</strong>
+            <span>Use a similar angle, distance, orientation and framing for a more reliable comparison.</span>
+          </div>
+        </section>
+
+        <input
+          id="image-input"
+          class="visually-hidden"
+          type="file"
+          accept="image/jpeg,image/png"
+          capture="environment"
+        >
+
+        <div id="empty-state" class="drop-zone">
+          <div class="camera-icon" aria-hidden="true"></div>
+          <h3>Photograph or select an image</h3>
+          <p>On a phone, this opens the rear camera. On a laptop, select an existing image.</p>
+          <button id="choose-image-button" class="button button-primary" type="button">
+            Choose image
+          </button>
+        </div>
+
+        <div id="preview-state" class="preview-state" hidden>
+          <div class="image-frame">
+            <img id="image-preview" alt="Selected PIVC image preview">
+            <span id="image-name" class="image-name"></span>
+          </div>
+
+          <fieldset id="acquisition-confirmation" class="acquisition-confirmation">
+            <legend>Confirm before analysis</legend>
+            <label>
+              <input id="confirm-full-pivc" class="acquisition-check" type="checkbox">
+              <span>The complete hub and insertion-side endpoint are visible.</span>
+            </label>
+            <label>
+              <input id="confirm-marks-visible" class="acquisition-check" type="checkbox">
+              <span>At least two consecutive graduation marks are visible.</span>
+            </label>
+            <label>
+              <input id="confirm-image-clear" class="acquisition-check" type="checkbox">
+              <span>The image is clear and does not have strong glare or blur.</span>
+            </label>
+            <p id="confirmation-help">Confirm all three items to enable analysis.</p>
+          </fieldset>
+
+          <div class="button-row">
+            <button id="replace-image-button" class="button button-secondary" type="button">
+              Replace image
+            </button>
+            <button id="analyse-button" class="button button-primary" type="button" disabled>
+              Establish baseline
+            </button>
+          </div>
+        </div>
+
+        <div id="progress-panel" class="progress-panel" role="status" aria-live="polite" hidden>
+          <span class="spinner" aria-hidden="true"></span>
+          <div>
+            <strong>Analysing image</strong>
+            <p>Segmenting the PIVC, repairing the centreline and calibrating from the marks…</p>
+          </div>
+        </div>
+
+        <div id="request-error" class="message message-error" role="alert" hidden></div>
+      </article>
+
+      <article class="card result-card">
+        <div class="card-heading">
+          <div>
+            <p class="step-label">Step 2</p>
+            <h2 id="result-heading">Baseline result</h2>
+          </div>
+          <span id="result-status" class="status-badge status-idle">Waiting for image</span>
+        </div>
+
+        <div id="result-placeholder" class="result-placeholder">
+          <div class="result-placeholder-line"></div>
+          <div class="result-placeholder-line short"></div>
+          <p>Your external-length measurement and quality information will appear here.</p>
+        </div>
+
+        <section id="measured-panel" class="measured-panel" hidden>
+          <div class="primary-measurement">
+            <span>External PIVC length</span>
+            <strong><span id="external-length">—</span> <small>cm</small></strong>
+          </div>
+
+          <div id="baseline-session-panel" class="baseline-session-panel" hidden>
+            <div>
+              <span class="baseline-label">Baseline established</span>
+              <strong id="baseline-session-id">-</strong>
+            </div>
+
+            <div>
+              <span class="baseline-label">Created</span>
+              <strong id="baseline-created-at">-</strong>
+            </div>
+
+            <button id="start-new-session-button" class="button button-secondary" type="button">
+              Start new session
+            </button>
+          </div>
+
+          <dl class="metric-grid">
+            <div><dt>PIVC detected</dt><dd id="pivc-detected">—</dd></div>
+            <div><dt>Model confidence</dt><dd id="pivc-confidence">—</dd></div>
+            <div><dt>Marks detected</dt><dd id="marks-detected">—</dd></div>
+            <div><dt>Centreline length</dt><dd id="centreline-length">—</dd></div>
+            <div><dt>Calibration</dt><dd id="pixels-per-cm">—</dd></div>
+            <div><dt>Mark spacing</dt><dd id="mark-spacings">—</dd></div>
+          </dl>
+        </section>
+
+        <section id="rejected-panel" class="message message-rejected" hidden>
+          <span class="message-symbol" aria-hidden="true">!</span>
+          <div>
+            <h3>Measurement rejected</h3>
+            <p id="rejection-reason"></p>
+            <small id="rejection-stage"></small>
+          </div>
+        </section>
+
+        <section id="diagnostic-panel" class="diagnostic-panel" hidden>
+          <div class="diagnostic-heading">
+            <div>
+              <p class="step-label">AI evidence</p>
+              <h3>Diagnostic overlay</h3>
+            </div>
+            <a id="open-diagnostic" href="#" target="_blank" rel="noopener">Open full image</a>
+          </div>
+          <img id="baseline-diagnostic-image" alt="Baseline PIVC diagnostic overlay">
+          <p class="legend">Centreline, reconstructed bridges, mark centres and endpoints are shown where available.</p>
+        </section>
+
+        <section id="comparison-panel" class="comparison-panel" hidden>
+          <div class="comparison-heading">
+            <div>
+              <p class="step-label">Baseline comparison</p>
+              <h3>External-length change</h3>
+            </div>
+            <span id="follow-up-count" class="status-badge status-measured"></span>
+          </div>
+
+          <div class="comparison-metrics">
+            <div><span>Baseline</span><strong><span id="baseline-length-comparison">—</span> cm</strong></div>
+            <div><span>Follow-up</span><strong><span id="follow-up-length-comparison">—</span> cm</strong></div>
+            <div><span>Signed change</span><strong><span id="signed-change">—</span> cm</strong></div>
+            <div><span>Absolute change</span><strong><span id="absolute-change">—</span> cm</strong></div>
+          </div>
+
+          <div
+            id="research-indicator"
+            class="research-indicator indicator-neutral"
+            role="status"
+            aria-live="polite"
+            hidden
+          >
+            <div class="indicator-symbol" aria-hidden="true">↔</div>
+
+            <div>
+              <span class="indicator-eyebrow">Research change indicator</span>
+              <h3 id="research-indicator-label">—</h3>
+              <p id="research-indicator-message"></p>
+              <small id="research-indicator-threshold"></small>
+            </div>
+          </div>
+
+          <p class="research-warning">
+            Research change indicator only. The ±0.10 cm boundary represents
+            measurement tolerance and is not a clinically validated dislodgement
+            threshold.
+          </p>
+
+          <div class="diagnostic-comparison">
+            <figure>
+              <figcaption>Baseline diagnostic</figcaption>
+              <img id="comparison-baseline-diagnostic-image" alt="Baseline diagnostic comparison">
+            </figure>
+            <figure>
+              <figcaption>Follow-up diagnostic</figcaption>
+              <img id="follow-up-diagnostic-image" alt="Follow-up PIVC diagnostic overlay">
+            </figure>
+          </div>
+        </section>
+      </article>
+    </section>
+
+    <section class="capture-guidance" aria-labelledby="guidance-title">
+      <div>
+        <p class="eyebrow">Image quality matters</p>
+        <h2 id="guidance-title">Before taking the photograph</h2>
+      </div>
+      <ul>
+        <li>Keep the complete hub and insertion-side endpoint visible.</li>
+        <li>Hold the camera approximately perpendicular to the surface.</li>
+        <li>Ensure at least two consecutive graduation marks are visible.</li>
+        <li>Avoid blur, strong glare and severe dressing wrinkles.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <span>PIVC Vision Lab · proof-of-concept</span>
+    <a href="/docs">API documentation</a>
+  </footer>
+</body>
+</html>
