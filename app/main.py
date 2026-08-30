@@ -12,9 +12,11 @@ from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 from ultralytics import YOLO
 from session_store import BaselineSessionStore
 from decimal import Decimal
+from settings_store import ResearchSettings, ResearchSettingsStore
 
 # ---------------------------------------------------------------------
 # Paths
@@ -83,17 +85,27 @@ CONTENT_TYPE_SUFFIX = {
     "image/png": ".png",
 }
 
-MEASUREMENT_CONFIG = ValidationConfig(
-    imgsz=960,
-    confidence=0.50,
-    iou=0.70,
-    device="cpu",
-    known_mark_spacing_cm=1.0,
-    accuracy_tolerance_cm=0.10,
-)
-
 SESSION_STORE = BaselineSessionStore()
-RESEARCH_CHANGE_THRESHOLD_CM = Decimal("0.10")
+SETTINGS_STORE = ResearchSettingsStore()
+
+
+class SettingsUpdate(BaseModel):
+    confidence: float = Field(ge=0.05, le=0.95)
+    iou: float = Field(ge=0.10, le=0.95)
+    tolerance_cm: float = Field(ge=0.01, le=1.00)
+
+
+def validation_config_for(
+    settings: ResearchSettings,
+) -> ValidationConfig:
+    return ValidationConfig(
+        imgsz=settings.imgsz,
+        confidence=settings.confidence,
+        iou=settings.iou,
+        device="cpu",
+        known_mark_spacing_cm=1.0,
+        accuracy_tolerance_cm=settings.tolerance_cm,
+    )
 
 # ---------------------------------------------------------------------
 # Model lifecycle
@@ -129,7 +141,7 @@ async def lifespan(app: FastAPI):
     print(f"Loaded model: {MODEL_PATH}")
     print(f"Model task: {model.task}")
     print(f"Classes: {class_names}")
-    print(f"Device: {MEASUREMENT_CONFIG.device}")
+    print("Device: cpu")
 
     yield
 
@@ -230,6 +242,7 @@ def diagnostic_url(request: Request, diagnostic_path: str) -> str | None:
 
 def classify_research_change(
     signed_change_cm: float | None,
+    tolerance_cm: float,
 ) -> dict:
     """
     Classify measured external-length change for research demonstration.
@@ -238,7 +251,7 @@ def classify_research_change(
     a clinically validated dislodgement threshold.
     """
 
-    threshold = RESEARCH_CHANGE_THRESHOLD_CM
+    threshold = Decimal(str(tolerance_cm))
 
     if signed_change_cm is None:
         return {
@@ -261,7 +274,7 @@ def classify_research_change(
             "direction": "stable",
             "threshold_cm": float(threshold),
             "message": (
-                "The measured change is within the ±0.10 cm "
+                f"The measured change is within the ±{threshold} cm "
                 "research tolerance."
             ),
         }
@@ -302,6 +315,7 @@ def root():
 
 @app.get("/health")
 def health(request: Request):
+    settings = SETTINGS_STORE.get()
     return {
         "status": "ok",
         "model_loaded": getattr(request.app.state, "model", None) is not None,
@@ -311,19 +325,64 @@ def health(request: Request):
             None,
         ),
         "classes": getattr(request.app.state, "class_names", {}),
-        "device": MEASUREMENT_CONFIG.device,
-        "imgsz": MEASUREMENT_CONFIG.imgsz,
-        "confidence": MEASUREMENT_CONFIG.confidence,
-        "iou": MEASUREMENT_CONFIG.iou,
+        "device": "cpu",
+        "imgsz": settings.imgsz,
+        "confidence": settings.confidence,
+        "iou": settings.iou,
         "active_sessions": SESSION_STORE.count(),
     }
+
+
+def settings_response(request: Request, settings: ResearchSettings) -> dict:
+    model = getattr(request.app.state, "model", None)
+    return {
+        "editable": {
+            "confidence": settings.confidence,
+            "iou": settings.iou,
+            "tolerance_cm": settings.tolerance_cm,
+        },
+        "runtime": {
+            "imgsz": settings.imgsz,
+            "device": "cpu",
+            "model_filename": MODEL_PATH.name,
+            "model_loaded": model is not None,
+            "model_task": getattr(model, "task", None),
+            "classes": getattr(request.app.state, "class_names", {}),
+            "application_version": app.version,
+        },
+        "applies_to": "new_sessions",
+        "warning": "Research demonstration only; not clinically validated.",
+    }
+
+
+@app.get("/api/v1/settings")
+def get_settings(request: Request):
+    return settings_response(request, SETTINGS_STORE.get())
+
+
+@app.put("/api/v1/settings")
+def update_settings(request: Request, update: SettingsUpdate):
+    settings = SETTINGS_STORE.update(
+        confidence=update.confidence,
+        iou=update.iou,
+        tolerance_cm=update.tolerance_cm,
+    )
+    return settings_response(request, settings)
+
+
+@app.post("/api/v1/settings/reset")
+def reset_settings(request: Request):
+    return settings_response(request, SETTINGS_STORE.reset())
 
 
 @app.post("/api/v1/measure")
 async def measure_pivc(
     request: Request,
     image: UploadFile = File(...),
+    settings: ResearchSettings | None = None,
 ):
+    selected_settings = settings or SETTINGS_STORE.get()
+    measurement_config = validation_config_for(selected_settings)
     content_type = (image.content_type or "").lower()
 
     if content_type not in ALLOWED_CONTENT_TYPES:
@@ -357,7 +416,7 @@ async def measure_pivc(
         result = process_validation_case(
             case=case,
             model=request.app.state.model,
-            config=MEASUREMENT_CONFIG,
+            config=measurement_config,
             diagnostics_dir=DIAGNOSTIC_DIR,
         )
     finally:
@@ -433,9 +492,11 @@ async def establish_baseline(
     A rejected measurement never creates a session.
     """
 
+    settings_snapshot = SETTINGS_STORE.get()
     measurement = await measure_pivc(
         request=request,
         image=image,
+        settings=settings_snapshot,
     )
 
     if measurement["measurement_status"] != "MEASURED":
@@ -450,7 +511,10 @@ async def establish_baseline(
             ),
         }
 
-    session = SESSION_STORE.create(measurement)
+    session = SESSION_STORE.create(
+        measurement,
+        settings_snapshot.to_dict(),
+    )
 
     return {
         **session,
@@ -486,7 +550,12 @@ async def analyse_follow_up(
             detail="The requested baseline session was not found.",
         )
 
-    measurement = await measure_pivc(request=request, image=image)
+    settings_snapshot = ResearchSettings(**session["settings"])
+    measurement = await measure_pivc(
+        request=request,
+        image=image,
+        settings=settings_snapshot,
+    )
 
     if measurement["measurement_status"] != "MEASURED":
         return {
@@ -495,7 +564,10 @@ async def analyse_follow_up(
             "baseline": session["baseline"],
             "follow_up": measurement,
             "comparison": None,
-            "research_indicator": classify_research_change(None),
+            "research_indicator": classify_research_change(
+                None,
+                settings_snapshot.tolerance_cm,
+            ),
             "successful_follow_up_count": len(session["follow_ups"]),
             "message": (
                 "The follow-up was not stored because it did not produce "
@@ -503,11 +575,21 @@ async def analyse_follow_up(
             ),
         }
 
-    updated = SESSION_STORE.add_follow_up(session_id, measurement)
-    entry = updated["follow_ups"][-1]
+    signed_change = round(
+        float(measurement["external_length_cm"])
+        - float(session["baseline"]["external_length_cm"]),
+        3,
+    )
     research_indicator = classify_research_change(
-    entry["signed_change_cm"]
-)
+        signed_change,
+        settings_snapshot.tolerance_cm,
+    )
+    updated = SESSION_STORE.add_follow_up(
+        session_id,
+        measurement,
+        research_indicator,
+    )
+    entry = updated["follow_ups"][-1]
 
     return {
         "session_id": session_id,

@@ -13,7 +13,11 @@ class BaselineSessionStore:
         self._sessions: dict[str, dict] = {}
         self._lock = Lock()
 
-    def create(self, baseline_measurement: dict) -> dict:
+    def create(
+        self,
+        baseline_measurement: dict,
+        settings: dict,
+    ) -> dict:
         if baseline_measurement.get("measurement_status") != "MEASURED":
             raise ValueError(
                 "A baseline session requires a successful measurement."
@@ -27,6 +31,7 @@ class BaselineSessionStore:
             "session_status": "BASELINE_ESTABLISHED",
             "created_at": created_at,
             "baseline": deepcopy(baseline_measurement),
+            "settings": deepcopy(settings),
             "follow_ups": [],
         }
 
@@ -45,6 +50,7 @@ class BaselineSessionStore:
         self,
         session_id: str,
         follow_up_measurement: dict,
+        research_indicator: dict,
     ) -> dict | None:
         if follow_up_measurement.get("measurement_status") != "MEASURED":
             raise ValueError(
@@ -70,6 +76,7 @@ class BaselineSessionStore:
                 "measurement": deepcopy(follow_up_measurement),
                 "signed_change_cm": signed_change,
                 "absolute_change_cm": round(abs(signed_change), 3),
+                "research_indicator": deepcopy(research_indicator),
             }
             session["follow_ups"].append(entry)
             session["session_status"] = "FOLLOW_UP_MEASURED"
