@@ -94,6 +94,9 @@ h1 { max-width: 820px; margin: 0; font-size: clamp(2rem, 4vw, 3.7rem); line-heig
 .button-secondary { color: var(--teal-900); border: 1px solid #9ec9c5; background: white; }
 .button-row { display: flex; gap: 12px; margin-top: 16px; }
 .button-row .button { flex: 1; }
+.capture-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: min(100%, 420px); margin-top: 18px; }
+.capture-choice-row { flex-wrap: wrap; }
+.capture-choice-row .button { min-width: 145px; }
 
 .image-frame { position: relative; min-height: 410px; display: grid; place-items: center; overflow: hidden; border-radius: 18px; background: #e8eeee; }
 .image-frame img { display: block; width: 100%; height: 410px; object-fit: contain; }
@@ -294,6 +297,9 @@ h1 { max-width: 820px; margin: 0; font-size: clamp(2rem, 4vw, 3.7rem); line-heig
 .diagnostic-comparison img { display: block; width: 100%; min-height: 220px; max-height: 430px; object-fit: contain; border: 1px solid var(--line); border-radius: 12px; background: #e9eeee; }
 
 @media (max-width: 600px) {
+  .capture-actions { grid-template-columns: 1fr; }
+  .capture-choice-row { display: grid; grid-template-columns: 1fr 1fr; }
+  .capture-choice-row #analyse-button { grid-column: 1 / -1; }
   .baseline-session-panel {
     grid-template-columns: 1fr;
   }

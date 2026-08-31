@@ -1,7 +1,9 @@
 const $ = (selector) => document.querySelector(selector);
 const elements = {
-  input: $("#image-input"), chooseButton: $("#choose-image-button"),
-  replaceButton: $("#replace-image-button"), analyseButton: $("#analyse-button"),
+  cameraInput: $("#camera-input"), albumInput: $("#album-input"),
+  cameraButton: $("#use-camera-button"), albumButton: $("#choose-album-button"),
+  replaceCameraButton: $("#replace-camera-button"), replaceAlbumButton: $("#replace-album-button"),
+  analyseButton: $("#analyse-button"),
   newSessionButton: $("#start-new-session-button"), captureHeading: $("#capture-heading"),
   resultHeading: $("#result-heading"), emptyState: $("#empty-state"),
   previewState: $("#preview-state"), preview: $("#image-preview"),
@@ -72,6 +74,10 @@ function showRequestError(message) {
   elements.requestError.textContent = message;
   setHidden(elements.requestError, false);
 }
+function openImagePicker(input) {
+  input.value = "";
+  input.click();
+}
 function updateAnalysisReadiness() {
   const ready = Boolean(selectedFile)
     && acquisitionChecks.every((checkbox) => checkbox.checked);
@@ -87,7 +93,8 @@ function resetAcquisitionConfirmation() {
 }
 function clearSelectedImage() {
   selectedFile = null;
-  elements.input.value = "";
+  elements.cameraInput.value = "";
+  elements.albumInput.value = "";
   if (previewUrl) URL.revokeObjectURL(previewUrl);
   previewUrl = null;
   elements.preview.removeAttribute("src");
@@ -111,7 +118,6 @@ function resetForNewSession() {
   setHidden(elements.followUpGuidance, true);
   elements.captureHeading.textContent = "Choose a baseline image";
   elements.resultHeading.textContent = "Baseline result";
-  elements.chooseButton.textContent = "Choose image";
   elements.analyseButton.textContent = "Establish baseline";
   elements.status.textContent = "Waiting for image";
   elements.status.className = "status-badge status-idle";
@@ -124,7 +130,6 @@ function prepareFollowUpCapture() {
   clearSelectedImage();
   elements.captureHeading.textContent = "Choose a follow-up image";
   elements.resultHeading.textContent = "Latest comparison";
-  elements.chooseButton.textContent = "Choose follow-up image";
   elements.analyseButton.textContent = "Compare with baseline";
   setHidden(elements.followUpGuidance, false);
 }
@@ -428,11 +433,14 @@ async function analyseImage() {
   }
 }
 
-elements.chooseButton.addEventListener("click", () => elements.input.click());
-elements.replaceButton.addEventListener("click", () => elements.input.click());
+elements.cameraButton.addEventListener("click", () => openImagePicker(elements.cameraInput));
+elements.albumButton.addEventListener("click", () => openImagePicker(elements.albumInput));
+elements.replaceCameraButton.addEventListener("click", () => openImagePicker(elements.cameraInput));
+elements.replaceAlbumButton.addEventListener("click", () => openImagePicker(elements.albumInput));
 elements.analyseButton.addEventListener("click", analyseImage);
 elements.newSessionButton.addEventListener("click", resetForNewSession);
-elements.input.addEventListener("change", (event) => selectImage(event.target.files?.[0]));
+elements.cameraInput.addEventListener("change", (event) => selectImage(event.target.files?.[0]));
+elements.albumInput.addEventListener("change", (event) => selectImage(event.target.files?.[0]));
 elements.settingsForm.addEventListener("submit", saveSettings);
 elements.settingsResetButton.addEventListener("click", resetSettings);
 elements.sessionsRefreshButton.addEventListener("click", loadSessions);

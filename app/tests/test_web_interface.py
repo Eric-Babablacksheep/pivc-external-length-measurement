@@ -26,10 +26,13 @@ class WebInterfaceStructureTests(unittest.TestCase):
     def test_html_exposes_capture_preview_and_result_states(self):
         html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
         for required_id in (
-            "image-input",
+            "camera-input",
+            "album-input",
             "image-preview",
-            "choose-image-button",
-            "replace-image-button",
+            "use-camera-button",
+            "choose-album-button",
+            "replace-camera-button",
+            "replace-album-button",
             "analyse-button",
             "progress-panel",
             "measured-panel",
@@ -37,8 +40,36 @@ class WebInterfaceStructureTests(unittest.TestCase):
             "baseline-diagnostic-image",
         ):
             self.assertRegex(html, rf'id=["\']{re.escape(required_id)}["\']')
-        self.assertIn('capture="environment"', html)
-        self.assertIn('accept="image/jpeg,image/png"', html)
+        camera_input = re.search(
+            r'<input[^>]+id=["\']camera-input["\'][^>]*>', html
+        )
+        album_input = re.search(
+            r'<input[^>]+id=["\']album-input["\'][^>]*>', html
+        )
+        self.assertIsNotNone(camera_input)
+        self.assertIsNotNone(album_input)
+        self.assertIn('capture="environment"', camera_input.group(0))
+        self.assertNotIn("capture=", album_input.group(0))
+        self.assertIn('accept="image/jpeg,image/png"', camera_input.group(0))
+        self.assertIn('accept="image/jpeg,image/png"', album_input.group(0))
+
+    def test_camera_and_album_choices_share_image_selection_flow(self):
+        javascript = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+        for token in (
+            "openImagePicker(elements.cameraInput)",
+            "openImagePicker(elements.albumInput)",
+            'elements.cameraInput.addEventListener("change"',
+            'elements.albumInput.addEventListener("change"',
+        ):
+            self.assertIn(token, javascript)
+        self.assertGreaterEqual(javascript.count("selectImage(event.target.files?.[0])"), 2)
+
+    def test_picker_clears_previous_value_before_reopening(self):
+        javascript = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+        self.assertIn("function openImagePicker(input)", javascript)
+        self.assertIn('input.value = ""', javascript)
+        self.assertIn("openImagePicker(elements.cameraInput)", javascript)
+        self.assertIn("openImagePicker(elements.albumInput)", javascript)
 
     def test_javascript_establishes_baseline_and_submits_follow_up(self):
         javascript = (STATIC_DIR / "app.js").read_text(encoding="utf-8")

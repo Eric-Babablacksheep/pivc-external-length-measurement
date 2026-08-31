@@ -51,11 +51,15 @@
             <div id="follow-up-guidance" class="follow-up-guide" hidden><strong>Match the baseline image</strong><span>Use a similar angle, distance, orientation and framing.</span></div>
           </section>
 
-          <input id="image-input" class="visually-hidden" type="file" accept="image/jpeg,image/png" capture="environment">
+          <input id="camera-input" class="visually-hidden" type="file" accept="image/jpeg,image/png" capture="environment">
+          <input id="album-input" class="visually-hidden" type="file" accept="image/jpeg,image/png">
           <div id="empty-state" class="drop-zone">
-            <div class="camera-icon" aria-hidden="true"></div><h3>Photograph or select an image</h3>
-            <p>Phone devices can open the rear camera; laptops can select an existing image.</p>
-            <button id="choose-image-button" class="button button-primary" type="button">Choose image</button>
+            <div class="camera-icon" aria-hidden="true"></div><h3>Choose how to add the image</h3>
+            <p>Take a new photograph with the rear camera, or use an existing photograph from the album.</p>
+            <div class="capture-actions" aria-label="Image source">
+              <button id="use-camera-button" class="button button-primary" type="button">Use rear camera</button>
+              <button id="choose-album-button" class="button button-secondary" type="button">Choose from album</button>
+            </div>
           </div>
           <div id="preview-state" class="preview-state" hidden>
             <div class="image-frame"><img id="image-preview" alt="Selected PIVC image preview"><span id="image-name" class="image-name"></span></div>
@@ -66,7 +70,7 @@
               <label><input id="confirm-image-clear" class="acquisition-check" type="checkbox"><span>The image is clear without strong glare or blur.</span></label>
               <p id="confirmation-help">Confirm all three items to enable analysis.</p>
             </fieldset>
-            <div class="button-row"><button id="replace-image-button" class="button button-secondary" type="button">Replace image</button><button id="analyse-button" class="button button-primary" type="button" disabled>Establish baseline</button></div>
+            <div class="button-row capture-choice-row"><button id="replace-camera-button" class="button button-secondary" type="button">Retake photo</button><button id="replace-album-button" class="button button-secondary" type="button">Choose another</button><button id="analyse-button" class="button button-primary" type="button" disabled>Establish baseline</button></div>
           </div>
           <div id="progress-panel" class="progress-panel" role="status" aria-live="polite" hidden><span class="spinner" aria-hidden="true"></span><div><strong>Analysing image</strong><p>Segmenting, reconstructing and calibrating…</p></div></div>
           <div id="request-error" class="message message-error" role="alert" hidden></div>
