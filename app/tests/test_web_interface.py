@@ -87,6 +87,8 @@ class WebInterfaceStructureTests(unittest.TestCase):
             "capture-heading",
             "result-heading",
             "start-new-session-button",
+            "continue-follow-up-button",
+            "capture-card",
             "comparison-panel",
             "baseline-length-comparison",
             "follow-up-length-comparison",
@@ -96,6 +98,19 @@ class WebInterfaceStructureTests(unittest.TestCase):
             "follow-up-diagnostic-image",
         ):
             self.assertRegex(html, rf'id=["\']{re.escape(required_id)}["\']')
+
+    def test_results_action_returns_user_to_follow_up_acquisition(self):
+        javascript = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+        for token in (
+            "function goToFollowUpCapture()",
+            "prepareFollowUpCapture()",
+            'scrollIntoView({ behavior: "smooth", block: "start" })',
+            "elements.cameraButton.focus()",
+            'elements.continueFollowUpButton.addEventListener("click"',
+            'elements.continueFollowUpButton.textContent = "Add follow-up image"',
+            'elements.continueFollowUpButton.textContent = "Add another follow-up"',
+        ):
+            self.assertIn(token, javascript)
 
     def test_main_registers_follow_up_endpoint(self):
         source = (APP_DIR / "main.py").read_text(encoding="utf-8")

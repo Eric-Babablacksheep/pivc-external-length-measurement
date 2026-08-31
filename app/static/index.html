@@ -33,7 +33,7 @@
       </div>
 
       <section class="workspace" aria-label="PIVC image analysis">
-        <article class="card capture-card">
+        <article id="capture-card" class="card capture-card">
           <div class="card-heading">
             <div><p class="step-label">Acquisition</p><h2 id="capture-heading">Choose a baseline image</h2></div>
             <span class="format-note">JPG or PNG · max 20 MB</span>
@@ -84,6 +84,7 @@
             <div id="baseline-session-panel" class="baseline-session-panel" hidden>
               <div><span class="baseline-label">Baseline session</span><strong id="baseline-session-id">—</strong></div>
               <div><span class="baseline-label">Created</span><strong id="baseline-created-at">—</strong></div>
+              <button id="continue-follow-up-button" class="button button-primary" type="button" hidden>Add follow-up image</button>
               <button id="start-new-session-button" class="button button-secondary" type="button">Start new session</button>
             </div>
           </section>

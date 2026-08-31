@@ -1,4 +1,4 @@
-const CACHE_NAME = "pivc-vision-capture-choice-v1";
+const CACHE_NAME = "pivc-vision-follow-up-navigation-v1";
 const APP_SHELL = [
   "/",
   "/static/styles.css",

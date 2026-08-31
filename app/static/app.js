@@ -4,7 +4,9 @@ const elements = {
   cameraButton: $("#use-camera-button"), albumButton: $("#choose-album-button"),
   replaceCameraButton: $("#replace-camera-button"), replaceAlbumButton: $("#replace-album-button"),
   analyseButton: $("#analyse-button"),
-  newSessionButton: $("#start-new-session-button"), captureHeading: $("#capture-heading"),
+  newSessionButton: $("#start-new-session-button"),
+  continueFollowUpButton: $("#continue-follow-up-button"), captureCard: $("#capture-card"),
+  captureHeading: $("#capture-heading"),
   resultHeading: $("#result-heading"), emptyState: $("#empty-state"),
   previewState: $("#preview-state"), preview: $("#image-preview"),
   imageName: $("#image-name"), progress: $("#progress-panel"),
@@ -133,6 +135,11 @@ function prepareFollowUpCapture() {
   elements.analyseButton.textContent = "Compare with baseline";
   setHidden(elements.followUpGuidance, false);
 }
+function goToFollowUpCapture() {
+  prepareFollowUpCapture();
+  elements.captureCard.scrollIntoView({ behavior: "smooth", block: "start" });
+  elements.cameraButton.focus();
+}
 function selectImage(file) {
   if (!file) return;
   if (!["image/jpeg", "image/png"].includes(file.type)) {
@@ -189,6 +196,8 @@ function showBaselineSession(result, makeActive = true) {
   const createdAt = new Date(result.created_at);
   elements.baselineCreatedAt.textContent = Number.isNaN(createdAt.getTime()) ? result.created_at : createdAt.toLocaleString();
   setHidden(elements.baselineSessionPanel, false);
+  setHidden(elements.continueFollowUpButton, !makeActive);
+  elements.continueFollowUpButton.textContent = "Add follow-up image";
   $("#technical-session-id").textContent = result.session_id;
   $("#technical-timestamp").textContent = result.created_at;
   const settings = result.settings;
@@ -251,6 +260,7 @@ function showComparison(result) {
   elements.status.textContent = "Follow-up compared";
   elements.status.className = "status-badge status-measured";
   showResearchIndicator(result.research_indicator);
+  elements.continueFollowUpButton.textContent = "Add another follow-up";
 }
 
 async function loadSettings() {
@@ -375,6 +385,7 @@ async function openSession(sessionId) {
     activateView("analyse");
     if (window.confirm("Continue this session with another follow-up image?")) {
       activeSessionId = session.session_id;
+      setHidden(elements.continueFollowUpButton, false);
       prepareFollowUpCapture();
     } else {
       activeSessionId = null;
@@ -439,6 +450,7 @@ elements.replaceCameraButton.addEventListener("click", () => openImagePicker(ele
 elements.replaceAlbumButton.addEventListener("click", () => openImagePicker(elements.albumInput));
 elements.analyseButton.addEventListener("click", analyseImage);
 elements.newSessionButton.addEventListener("click", resetForNewSession);
+elements.continueFollowUpButton.addEventListener("click", goToFollowUpCapture);
 elements.cameraInput.addEventListener("change", (event) => selectImage(event.target.files?.[0]));
 elements.albumInput.addEventListener("change", (event) => selectImage(event.target.files?.[0]));
 elements.settingsForm.addEventListener("submit", saveSettings);
