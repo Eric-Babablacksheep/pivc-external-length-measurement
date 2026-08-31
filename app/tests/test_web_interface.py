@@ -112,6 +112,20 @@ class WebInterfaceStructureTests(unittest.TestCase):
         ):
             self.assertIn(token, javascript)
 
+    def test_rejected_baseline_exposes_a_clean_retry_route(self):
+        html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        javascript = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+        self.assertRegex(html, r'id=["\']retry-baseline-button["\']')
+        for token in (
+            "function retryRejectedBaseline()",
+            "resetForNewSession()",
+            'scrollIntoView({ behavior: "smooth", block: "start" })',
+            "elements.cameraButton.focus()",
+            "setHidden(elements.retryBaselineButton, followUp)",
+            'elements.retryBaselineButton.addEventListener("click"',
+        ):
+            self.assertIn(token, javascript)
+
     def test_main_registers_follow_up_endpoint(self):
         source = (APP_DIR / "main.py").read_text(encoding="utf-8")
         self.assertIn('/api/v1/sessions/{session_id}/follow-up', source)

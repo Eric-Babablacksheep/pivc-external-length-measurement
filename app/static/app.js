@@ -12,7 +12,8 @@ const elements = {
   imageName: $("#image-name"), progress: $("#progress-panel"),
   requestError: $("#request-error"), resultPlaceholder: $("#result-placeholder"),
   status: $("#result-status"), measuredPanel: $("#measured-panel"),
-  rejectedPanel: $("#rejected-panel"), diagnosticPanel: $("#diagnostic-panel"),
+  rejectedPanel: $("#rejected-panel"), retryBaselineButton: $("#retry-baseline-button"),
+  diagnosticPanel: $("#diagnostic-panel"),
   baselineDiagnosticImage: $("#baseline-diagnostic-image"),
   diagnosticLink: $("#open-diagnostic"), baselineSessionPanel: $("#baseline-session-panel"),
   baselineSessionId: $("#baseline-session-id"), baselineCreatedAt: $("#baseline-created-at"),
@@ -140,6 +141,11 @@ function goToFollowUpCapture() {
   elements.captureCard.scrollIntoView({ behavior: "smooth", block: "start" });
   elements.cameraButton.focus();
 }
+function retryRejectedBaseline() {
+  resetForNewSession();
+  elements.captureCard.scrollIntoView({ behavior: "smooth", block: "start" });
+  elements.cameraButton.focus();
+}
 function selectImage(file) {
   if (!file) return;
   if (!["image/jpeg", "image/png"].includes(file.type)) {
@@ -185,6 +191,7 @@ function showRejected(result, followUp = false) {
   setHidden(elements.resultPlaceholder, true);
   if (!followUp) setHidden(elements.measuredPanel, true);
   setHidden(elements.rejectedPanel, false);
+  setHidden(elements.retryBaselineButton, followUp);
   elements.status.textContent = followUp ? "Follow-up rejected" : "Measurement rejected";
   elements.status.className = "status-badge status-rejected";
   $("#rejection-reason").textContent = result.rejection_reason || "The image could not produce a safe measurement.";
@@ -451,6 +458,7 @@ elements.replaceAlbumButton.addEventListener("click", () => openImagePicker(elem
 elements.analyseButton.addEventListener("click", analyseImage);
 elements.newSessionButton.addEventListener("click", resetForNewSession);
 elements.continueFollowUpButton.addEventListener("click", goToFollowUpCapture);
+elements.retryBaselineButton.addEventListener("click", retryRejectedBaseline);
 elements.cameraInput.addEventListener("change", (event) => selectImage(event.target.files?.[0]));
 elements.albumInput.addEventListener("change", (event) => selectImage(event.target.files?.[0]));
 elements.settingsForm.addEventListener("submit", saveSettings);
