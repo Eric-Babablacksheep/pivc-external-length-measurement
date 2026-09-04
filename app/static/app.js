@@ -209,8 +209,14 @@ function showBaselineSession(result, makeActive = true) {
   $("#technical-timestamp").textContent = result.created_at;
   const settings = result.settings;
   $("#technical-settings").textContent = settings
-    ? `conf ${settings.confidence}, IoU ${settings.iou}, tolerance ±${settings.tolerance_cm} cm, ${settings.imgsz}px`
-    : "Not available";
+  ? (
+      `PIVC conf ${settings.pivc_confidence}, ` +
+      `mark conf ${settings.mark_confidence}, ` +
+      `IoU ${settings.iou}, ` +
+      `tolerance ±${settings.tolerance_cm} cm, ` +
+      `${settings.imgsz}px`
+    )
+  : "Not available";
   elements.settingsApplyNote.textContent = "An active session keeps its original settings. Changes apply to the next baseline.";
 }
 function showResearchIndicator(indicator) {
@@ -276,7 +282,8 @@ async function loadSettings() {
     const response = await fetch("/api/v1/settings");
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "Settings could not be loaded.");
-    $("#setting-confidence").value = payload.editable.confidence;
+    $("#setting-pivc-confidence").value = payload.editable.pivc_confidence;
+    $("#setting-mark-confidence").value = payload.editable.mark_confidence;
     $("#setting-iou").value = payload.editable.iou;
     $("#setting-tolerance").value = payload.editable.tolerance_cm;
     $("#runtime-imgsz").textContent = `${payload.runtime.imgsz} px`;
@@ -297,7 +304,8 @@ async function saveSettings(event) {
   setHidden(elements.settingsError, true);
   setHidden(elements.settingsSuccess, true);
   const update = {
-    confidence: Number($("#setting-confidence").value),
+    pivc_confidence: Number($("#setting-pivc-confidence").value),
+    mark_confidence: Number($("#setting-mark-confidence").value),
     iou: Number($("#setting-iou").value),
     tolerance_cm: Number($("#setting-tolerance").value),
   };
@@ -314,7 +322,6 @@ async function saveSettings(event) {
         : payload.detail;
       throw new Error(detail || "Settings were rejected.");
     }
-    localStorage.setItem("pivc-settings", JSON.stringify(payload.editable));
     elements.settingsSuccess.textContent = activeSessionId
       ? "Saved. These defaults apply to the next baseline session."
       : "Research defaults saved.";
@@ -329,12 +336,11 @@ async function saveSettings(event) {
 }
 
 async function resetSettings() {
-  if (!window.confirm("Restore confidence 0.50, IoU 0.70 and tolerance 0.10 cm?")) return;
+  if (!window.confirm("Restore all backend default settings?")) return;
   try {
     const response = await fetch("/api/v1/settings/reset", { method: "POST" });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "Defaults could not be reset.");
-    localStorage.setItem("pivc-settings", JSON.stringify(payload.editable));
     await loadSettings();
     elements.settingsSuccess.textContent = "Validated defaults restored.";
     setHidden(elements.settingsSuccess, false);
