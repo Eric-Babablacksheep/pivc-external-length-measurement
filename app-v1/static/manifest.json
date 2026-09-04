@@ -1,0 +1,10 @@
+{
+  "name": "PIVC Vision Lab",
+  "short_name": "PIVC Vision",
+  "description": "Research demonstration of AI-assisted external PIVC length measurement.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f8fa",
+  "theme_color": "#0f766e",
+  "icons": []
+}
