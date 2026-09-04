@@ -27,11 +27,11 @@ APP_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = APP_DIR.parent
 
 PIVC_MODULE_DIR = Path(
-    os.getenv("PIVC_MODULE_DIR", PROJECT_ROOT / "pi-cent_conv")
+    os.getenv("PIVC_MODULE_DIR", PROJECT_ROOT / "pi-cent_conv-v2")
 ).resolve()
 
 MODEL_PATH = Path(
-    os.getenv("PIVC_MODEL_PATH", PIVC_MODULE_DIR / "best.pt")
+    os.getenv("PIVC_MODEL_PATH", PIVC_MODULE_DIR / "yolov8s.pt")
 ).resolve()
 
 RUNTIME_DIR = APP_DIR / "runtime"
@@ -91,9 +91,22 @@ SETTINGS_STORE = ResearchSettingsStore()
 
 
 class SettingsUpdate(BaseModel):
-    confidence: float = Field(ge=0.05, le=0.95)
-    iou: float = Field(ge=0.10, le=0.95)
-    tolerance_cm: float = Field(ge=0.01, le=1.00)
+    pivc_confidence: float = Field(
+        ge=0.05,
+        le=0.95,
+    )
+    mark_confidence: float = Field(
+        ge=0.05,
+        le=0.95,
+    )
+    iou: float = Field(
+        ge=0.10,
+        le=0.95,
+    )
+    tolerance_cm: float = Field(
+        ge=0.01,
+        le=1.00,
+    )
 
 
 def validation_config_for(
@@ -101,11 +114,13 @@ def validation_config_for(
 ) -> ValidationConfig:
     return ValidationConfig(
         imgsz=settings.imgsz,
-        confidence=settings.confidence,
+        confidence=settings.pivc_confidence,
+        mark_confidence=settings.mark_confidence,
         iou=settings.iou,
         device="cpu",
         known_mark_spacing_cm=1.0,
         accuracy_tolerance_cm=settings.tolerance_cm,
+        processing_max_dimension=1280,
     )
 
 # ---------------------------------------------------------------------
@@ -114,10 +129,11 @@ def validation_config_for(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if not MODEL_PATH.is_file():
+    if not MODEL_PATH.exists():
         raise RuntimeError(f"Model file was not found: {MODEL_PATH}")
 
-    model = YOLO(str(MODEL_PATH))
+    model = YOLO(str(MODEL_PATH),
+                 task="segment",)
 
     if getattr(model, "task", None) != "segment":
         raise RuntimeError(
@@ -138,6 +154,26 @@ async def lifespan(app: FastAPI):
 
     app.state.model = model
     app.state.class_names = class_names
+
+    print("Warming up the CPU inference model...")
+
+    warmup_image = np.zeros(
+        (960, 960, 3),
+        dtype=np.uint8,
+    )
+
+    model.predict(
+        source=warmup_image,
+        imgsz=960,
+        conf=0.30,
+        iou=0.70,
+        device="cpu",
+        retina_masks=True,
+        max_det=30,
+        verbose=False,
+    )
+
+    print("Model warm-up completed.")
 
     print(f"Loaded model: {MODEL_PATH}")
     print(f"Model task: {model.task}")
@@ -328,7 +364,8 @@ def health(request: Request):
         "classes": getattr(request.app.state, "class_names", {}),
         "device": "cpu",
         "imgsz": settings.imgsz,
-        "confidence": settings.confidence,
+        "pivc_confidence": settings.pivc_confidence,
+        "mark_confidence": settings.mark_confidence,
         "iou": settings.iou,
         "active_sessions": SESSION_STORE.count(),
     }
@@ -338,7 +375,8 @@ def settings_response(request: Request, settings: ResearchSettings) -> dict:
     model = getattr(request.app.state, "model", None)
     return {
         "editable": {
-            "confidence": settings.confidence,
+            "pivc_confidence": settings.pivc_confidence,
+            "mark_confidence": settings.mark_confidence,
             "iou": settings.iou,
             "tolerance_cm": settings.tolerance_cm,
         },
@@ -364,7 +402,8 @@ def get_settings(request: Request):
 @app.put("/api/v1/settings")
 def update_settings(request: Request, update: SettingsUpdate):
     settings = SETTINGS_STORE.update(
-        confidence=update.confidence,
+        pivc_confidence=update.pivc_confidence,
+        mark_confidence=update.mark_confidence,
         iou=update.iou,
         tolerance_cm=update.tolerance_cm,
     )
