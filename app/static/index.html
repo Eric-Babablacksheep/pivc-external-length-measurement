@@ -57,8 +57,8 @@
             <div class="camera-icon" aria-hidden="true"></div><h3>Choose how to add the image</h3>
             <p>Take a new photograph with the rear camera, or use an existing photograph from the album.</p>
             <div class="capture-actions" aria-label="Image source">
-              <button id="use-camera-button" class="button button-primary" type="button">Use rear camera</button>
-              <button id="choose-album-button" class="button button-secondary" type="button">Choose from album</button>
+              <button id="use-camera-button" class="button button-primary" type="button">Camera</button>
+              <button id="choose-album-button" class="button button-secondary" type="button">Album</button>
             </div>
           </div>
           <div id="preview-state" class="preview-state" hidden>
@@ -136,7 +136,8 @@
       <div class="settings-layout">
         <form id="settings-form" class="card settings-card">
           <h2>Defaults for new sessions</h2><p id="settings-apply-note">Changes apply to new baseline sessions.</p>
-          <label>Confidence threshold<input id="setting-confidence" type="number" min="0.05" max="0.95" step="0.01" required><small>Lower values may accept weak or duplicate predictions.</small></label>
+          <label>PIVC confidence threshold<input id="setting-pivc-confidence" type="number" min="0.05" max="0.95" step="0.01" required><small>Minimum confidence required to accept a PIVC mask.</small></label>
+          <label>Mark confidence threshold<input id="setting-mark-confidence" type="number" min="0.05" max="0.95" step="0.01" required><small>Minimum confidence required for graduation marks.</small></label>
           <label>IoU threshold<input id="setting-iou" type="number" min="0.10" max="0.95" step="0.01" required><small>Controls suppression of overlapping predictions.</small></label>
           <label>Research tolerance (cm)<input id="setting-tolerance" type="number" min="0.01" max="1.00" step="0.01" required><small>Engineering tolerance only; not a clinical threshold.</small></label>
           <div id="settings-error" class="message message-error" hidden></div><div id="settings-success" class="message message-success" hidden></div>
