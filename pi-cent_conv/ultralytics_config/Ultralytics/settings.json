@@ -1,0 +1,21 @@
+{
+  "settings_version": "0.0.6",
+  "datasets_dir": "C:\\Users\\User\\OneDrive\\Documents\\ChatGPT\\computer vision\\pi-cent_conv\\datasets",
+  "weights_dir": "weights",
+  "runs_dir": "runs",
+  "uuid": "0d49001248df34ed26292c4aa5a025f334ba63af656dda5c1ef5b2d33f94610c",
+  "sync": true,
+  "api_key": "",
+  "openai_api_key": "",
+  "clearml": true,
+  "comet": true,
+  "dvc": true,
+  "hub": true,
+  "mlflow": true,
+  "neptune": true,
+  "raytune": true,
+  "tensorboard": false,
+  "wandb": false,
+  "vscode_msg": true,
+  "openvino_msg": true
+}
