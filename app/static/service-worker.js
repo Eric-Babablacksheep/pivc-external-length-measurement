@@ -1,4 +1,4 @@
-const CACHE_NAME = "pivc-vision-baseline-retry-v1";
+const CACHE_NAME = "pivc-vision-dual-confidence-v2";
 const APP_SHELL = [
   "/",
   "/static/styles.css",
