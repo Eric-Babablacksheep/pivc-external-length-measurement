@@ -670,7 +670,13 @@ async def analyse_follow_up(
     return {
         "session_id": session_id,
         "session_status": "FOLLOW_UP_MEASURED",
+
+        # Complete session information for the comparison timeline.
         "baseline": updated["baseline"],
+        "baseline_created_at": updated["created_at"],
+        "follow_ups": updated["follow_ups"],
+
+        # Latest follow-up fields retained for the existing result display.
         "follow_up": entry["measurement"],
         "comparison": {
             "signed_change_cm": entry["signed_change_cm"],
