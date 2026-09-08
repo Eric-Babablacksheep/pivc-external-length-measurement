@@ -82,8 +82,6 @@
           <section id="measured-panel" class="measured-panel" hidden>
             <div class="primary-measurement"><span>Current external PIVC length</span><strong><span id="external-length">—</span> <small>cm</small></strong></div>
             <div id="baseline-session-panel" class="baseline-session-panel" hidden>
-              <div><span class="baseline-label">Baseline session</span><strong id="baseline-session-id">—</strong></div>
-              <div><span class="baseline-label">Created</span><strong id="baseline-created-at">—</strong></div>
               <button id="continue-follow-up-button" class="button button-primary" type="button" hidden>Add follow-up image</button>
               <button id="start-new-session-button" class="button button-secondary" type="button">Start new session</button>
             </div>
@@ -92,12 +90,7 @@
 
           <section id="comparison-panel" class="comparison-panel" hidden>
             <div class="comparison-heading"><div><p class="step-label">Baseline comparison</p><h3>External-length change</h3></div><span id="follow-up-count" class="status-badge status-measured"></span></div>
-            <div class="comparison-metrics kpi-grid">
-              <div><span>Baseline</span><strong><span id="baseline-length-comparison">—</span> cm</strong></div>
-              <div><span>Follow-up</span><strong><span id="follow-up-length-comparison">—</span> cm</strong></div>
-              <div><span>Signed change</span><strong><span id="signed-change">—</span> cm</strong></div>
-              <div><span>Absolute change</span><strong><span id="absolute-change">—</span> cm</strong></div>
-            </div>
+            <div id="comparison-history" class="comparison-history" aria-live="polite"></div>
             <div id="research-indicator" class="research-indicator indicator-neutral" role="status" aria-live="polite" hidden><div class="indicator-symbol" aria-hidden="true">↔</div><div><span class="indicator-eyebrow">Research change indicator</span><h3 id="research-indicator-label">—</h3><p id="research-indicator-message"></p><small id="research-indicator-threshold"></small></div></div>
             <p class="research-warning">Research indicator only. The configured boundary represents measurement tolerance, not a clinically validated dislodgement threshold.</p>
             <div class="diagnostic-comparison">
