@@ -15,9 +15,10 @@ const elements = {
   rejectedPanel: $("#rejected-panel"), retryBaselineButton: $("#retry-baseline-button"),
   diagnosticPanel: $("#diagnostic-panel"),
   baselineDiagnosticImage: $("#baseline-diagnostic-image"),
-  diagnosticLink: $("#open-diagnostic"), baselineSessionPanel: $("#baseline-session-panel"),
-  baselineSessionId: $("#baseline-session-id"), baselineCreatedAt: $("#baseline-created-at"),
+  diagnosticLink: $("#open-diagnostic"), 
+  baselineSessionPanel: $("#baseline-session-panel"),
   comparisonPanel: $("#comparison-panel"),
+  comparisonHistory: $("#comparison-history"),
   comparisonBaselineImage: $("#comparison-baseline-diagnostic-image"),
   followUpDiagnosticImage: $("#follow-up-diagnostic-image"), followUpCount: $("#follow-up-count"),
   researchIndicator: $("#research-indicator"),
@@ -115,6 +116,7 @@ function resetForNewSession() {
   setHidden(elements.rejectedPanel, true);
   setHidden(elements.diagnosticPanel, true);
   setHidden(elements.comparisonPanel, true);
+  elements.comparisonHistory.innerHTML = "";
   setHidden(elements.requestError, true);
   setHidden(elements.baselineSessionPanel, true);
   setHidden(elements.researchIndicator, true);
@@ -198,26 +200,39 @@ function showRejected(result, followUp = false) {
   $("#rejection-stage").textContent = result.rejection_stage ? `Rejected during: ${result.rejection_stage}` : "";
 }
 function showBaselineSession(result, makeActive = true) {
-  if (makeActive) activeSessionId = result.session_id;
-  elements.baselineSessionId.textContent = result.session_id;
-  const createdAt = new Date(result.created_at);
-  elements.baselineCreatedAt.textContent = Number.isNaN(createdAt.getTime()) ? result.created_at : createdAt.toLocaleString();
+  if (makeActive) {
+    activeSessionId = result.session_id;
+  }
+
   setHidden(elements.baselineSessionPanel, false);
   setHidden(elements.continueFollowUpButton, !makeActive);
-  elements.continueFollowUpButton.textContent = "Add follow-up image";
-  $("#technical-session-id").textContent = result.session_id;
-  $("#technical-timestamp").textContent = result.created_at;
+
+  elements.continueFollowUpButton.textContent =
+    "Add follow-up image";
+
+  // Session ID and creation time remain available only in
+  // the technical details section.
+  $("#technical-session-id").textContent =
+    result.session_id || "—";
+
+  $("#technical-timestamp").textContent =
+    result.created_at || "—";
+
   const settings = result.settings;
+
   $("#technical-settings").textContent = settings
-  ? (
-      `PIVC conf ${settings.pivc_confidence}, ` +
-      `mark conf ${settings.mark_confidence}, ` +
-      `IoU ${settings.iou}, ` +
-      `tolerance ±${settings.tolerance_cm} cm, ` +
-      `${settings.imgsz}px`
-    )
-  : "Not available";
-  elements.settingsApplyNote.textContent = "An active session keeps its original settings. Changes apply to the next baseline.";
+    ? (
+        `PIVC conf ${settings.pivc_confidence}, ` +
+        `mark conf ${settings.mark_confidence}, ` +
+        `IoU ${settings.iou}, ` +
+        `tolerance ±${settings.tolerance_cm} cm, ` +
+        `${settings.imgsz}px`
+      )
+    : "Not available";
+
+  elements.settingsApplyNote.textContent =
+    "An active session keeps its original settings. " +
+    "Changes apply to the next baseline.";
 }
 function showResearchIndicator(indicator) {
   if (!indicator) {
@@ -255,25 +270,146 @@ function showResearchIndicator(indicator) {
 
   setHidden(elements.researchIndicator, false);
 }
+function formatAnalysisTime(timestamp) {
+  if (!timestamp) {
+    return "Time unavailable";
+  }
+
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) {
+    return timestamp;
+  }
+
+  return date.toLocaleString();
+}
+
+function formatDifferenceFromBaseline(value) {
+  const difference = Number(value);
+
+  if (!Number.isFinite(difference)) {
+    return "Difference unavailable";
+  }
+
+  const sign = difference > 0 ? "+" : "";
+
+  return `${sign}${difference.toFixed(3)} cm`;
+}
+
+function renderComparisonHistory(
+  baseline,
+  baselineCreatedAt,
+  followUps,
+) {
+  const safeFollowUps = Array.isArray(followUps)
+    ? followUps
+    : [];
+
+  const baselineLength = Number(
+    baseline.external_length_cm,
+  ).toFixed(3);
+
+  const baselineCard = `
+    <article class="comparison-history-card baseline-history-card">
+      <span class="history-card-label">Baseline</span>
+
+      <strong class="history-card-length">
+        ${baselineLength} cm
+      </strong>
+
+      <span class="history-card-time">
+        Analyzed ${formatAnalysisTime(baselineCreatedAt)}
+      </span>
+    </article>
+  `;
+
+  const followUpCards = safeFollowUps.map(
+    (followUp, index) => {
+      const length = Number(
+        followUp.measurement.external_length_cm,
+      ).toFixed(3);
+
+      const difference = formatDifferenceFromBaseline(
+        followUp.signed_change_cm,
+      );
+
+      return `
+        <article class="comparison-history-card follow-up-history-card">
+          <span class="history-card-label">
+            Follow-up ${index + 1}
+          </span>
+
+          <strong class="history-card-length">
+            ${length} cm
+          </strong>
+
+          <span class="history-card-time">
+            Analyzed ${formatAnalysisTime(followUp.created_at)}
+          </span>
+
+          <span class="history-card-difference">
+            Difference from baseline:
+            <strong>${difference}</strong>
+          </span>
+        </article>
+      `;
+    },
+  ).join("");
+
+  elements.comparisonHistory.innerHTML =
+    baselineCard + followUpCards;
+}
 function showComparison(result) {
-  const signed = Number(result.comparison.signed_change_cm);
-  $("#baseline-length-comparison").textContent = Number(result.baseline.external_length_cm).toFixed(3);
-  $("#follow-up-length-comparison").textContent = Number(result.follow_up.external_length_cm).toFixed(3);
-  $("#signed-change").textContent = `${signed > 0 ? "+" : ""}${signed.toFixed(3)}`;
-  $("#absolute-change").textContent = Number(result.comparison.absolute_change_cm).toFixed(3);
-  elements.followUpCount.textContent = `Follow-up ${result.successful_follow_up_count}`;
+  const followUps = Array.isArray(result.follow_ups)
+    ? result.follow_ups
+    : [];
+
+  const latestFollowUp = followUps.at(-1);
+
+  if (!latestFollowUp) {
+    setHidden(elements.comparisonPanel, true);
+    return;
+  }
+
+  renderComparisonHistory(
+    result.baseline,
+    result.baseline_created_at,
+    followUps,
+  );
+
+  elements.followUpCount.textContent =
+    `Follow-up ${followUps.length}`;
+
   const baselineUrl = diagnosticUrl(result.baseline);
-  const followUpUrl = diagnosticUrl(result.follow_up);
-  if (baselineUrl) elements.comparisonBaselineImage.src = baselineUrl;
-  else elements.comparisonBaselineImage.removeAttribute("src");
-  if (followUpUrl) elements.followUpDiagnosticImage.src = followUpUrl;
-  else elements.followUpDiagnosticImage.removeAttribute("src");
+  const followUpUrl = diagnosticUrl(
+    latestFollowUp.measurement,
+  );
+
+  if (baselineUrl) {
+    elements.comparisonBaselineImage.src = baselineUrl;
+  } else {
+    elements.comparisonBaselineImage.removeAttribute("src");
+  }
+
+  if (followUpUrl) {
+    elements.followUpDiagnosticImage.src = followUpUrl;
+  } else {
+    elements.followUpDiagnosticImage.removeAttribute("src");
+  }
+
   setHidden(elements.comparisonPanel, false);
   setHidden(elements.rejectedPanel, true);
+
   elements.status.textContent = "Follow-up compared";
-  elements.status.className = "status-badge status-measured";
-  showResearchIndicator(result.research_indicator);
-  elements.continueFollowUpButton.textContent = "Add another follow-up";
+  elements.status.className =
+    "status-badge status-measured";
+
+  showResearchIndicator(
+    latestFollowUp.research_indicator,
+  );
+
+  elements.continueFollowUpButton.textContent =
+    "Add another follow-up";
 }
 
 async function loadSettings() {
@@ -385,14 +521,11 @@ async function openSession(sessionId) {
     showMeasurement(session.baseline);
     showBaselineDiagnostic(session.baseline);
     showBaselineSession(session, false);
-    const latest = session.follow_ups.at(-1);
-    if (latest) {
+    if (session.follow_ups.length > 0) {
       showComparison({
         baseline: session.baseline,
-        follow_up: latest.measurement,
-        comparison: latest,
-        research_indicator: latest.research_indicator,
-        successful_follow_up_count: session.follow_ups.length,
+        baseline_created_at: session.created_at,
+        follow_ups: session.follow_ups,
       });
     }
     activateView("analyse");
